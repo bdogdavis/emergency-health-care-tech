@@ -7,15 +7,15 @@ import stripe
 from fpdf import FPDF
 import io
 from cryptography.fernet import Fernet
-import db_utils # Our new database utility module
+import db_utils  # Our database utility module
 
 # --- Configuration ---
 try:
     stripe.api_key = st.secrets["stripe_secret_key"]
     BASE_PRICE_ID = st.secrets["base_price_id"]
     CHILD_PRICE_ID = st.secrets["child_price_id"]
-    FERNET_KEY = st.secrets["fernet_key"].encode() # Ensure it's bytes
-    APP_BASE_URL = st.secrets["app_base_url"]
+    FERNET_KEY = st.secrets["fernet_key"].encode()  # Ensure it's bytes
+    APP_BASE_URL ==st.secrets["app_base_url"]
     fernet = Fernet(FERNET_KEY)
 except KeyError as e:
     st.error(f"Configuration error: Missing secret key {e}. Please check your secrets.toml.")
@@ -23,7 +23,6 @@ except KeyError as e:
 except Exception as e:
     st.error(f"An error occurred during configuration: {e}")
     st.stop()
-
 
 # --- Helper Functions ---
 def calculate_total_monthly_cost(children):
@@ -33,29 +32,28 @@ def generate_unique_id():
     return str(uuid.uuid4())
 
 def is_certificate_valid_from_db(expiry_date_str, status):
-    if status!= 'active':
+    if status != 'active':
         return False
     if not expiry_date_str:
         return False
     try:
         # Ensure expiry_date_str is parsed correctly, assuming ISO format from DB
         expiry_date = datetime.fromisoformat(expiry_date_str.replace('Z', '+00:00'))
-        if expiry_date.tzinfo is None: # If no timezone, assume UTC
-             expiry_date = expiry_date.replace(tzinfo=timezone.utc)
+        if expiry_date.tzinfo is None:  # If no timezone, assume UTC
+            expiry_date = expiry_date.replace(tzinfo=timezone.utc)
         return expiry_date > datetime.now(timezone.utc)
     except ValueError:
         st.error(f"Error parsing certificate expiry date: {expiry_date_str}")
         return False
 
-
 def create_stripe_checkout_session(email, children_count, user_id_for_metadata):
     try:
-        line_items = 
+        line_items = [{"price": BASE_PRICE_ID, "quantity": 1}]  # Always include base price
         if children_count > 0:
             line_items.append({"price": CHILD_PRICE_ID, "quantity": children_count})
 
         checkout_session = stripe.checkout.Session.create(
-            customer_email=email, # Stripe can create or use existing customer by email
+            customer_email=email,  # Stripe can create or use existing customer by email
             payment_method_types=['card'],
             line_items=line_items,
             mode='subscription',
@@ -80,37 +78,36 @@ def update_stripe_subscription_children(subscription_id, new_quantity):
             elif item['price']['id'] == BASE_PRICE_ID:
                 base_item_id = item['id']
 
-        items_to_update =
+        items_to_update = []
         if base_item_id:
-             items_to_update.append({'id': base_item_id, 'quantity': 1}) # Keep base
-        else: # Should not happen if subscription was set up correctly
+            items_to_update.append({'id': base_item_id, 'quantity': 1})  # Keep base
+        else:  # Should not happen if subscription was set up correctly
             st.error("Base subscription item not found. Cannot update children.")
             return False
 
-        if child_item_id: # Child item exists
+        if child_item_id:  # Child item exists
             if new_quantity > 0:
                 items_to_update.append({'id': child_item_id, 'quantity': new_quantity})
-            else: # new_quantity is 0, remove it
+            else:  # new_quantity is 0, remove it
                 items_to_update.append({'id': child_item_id, 'deleted': True})
-        elif new_quantity > 0: # No child item exists, and new_quantity > 0, so add it
+        elif new_quantity > 0:  # No child item exists, and new_quantity > 0, so add it
             items_to_update.append({'price': CHILD_PRICE_ID, 'quantity': new_quantity})
         # If child_item_id is None and new_quantity is 0, do nothing for child item.
 
-        if not items_to_update: # Should at least have the base item
+        if not items_to_update:  # Should at least have the base item
             st.error("No items to update for the subscription.")
             return False
 
         stripe.Subscription.modify(
             subscription_id,
             items=items_to_update,
-            proration_behavior='create_prorations', # Or 'none' if you don't want prorations
-            payment_behavior='default_incomplete' # Handles SCA if needed
+            proration_behavior='create_prorations',  # Or 'none' if you don't want prorations
+            payment_behavior='default_incomplete'  # Handles SCA if needed
         )
         return True
     except stripe.error.StripeError as e:
         st.error(f"Stripe subscription update failed: {e}")
         return False
-
 
 def generate_certificate_pdf_bytes(name, cert_id, expiry_str, status):
     pdf = FPDF()
@@ -121,17 +118,16 @@ def generate_certificate_pdf_bytes(name, cert_id, expiry_str, status):
     pdf.set_font("Arial", '', 12)
     pdf.cell(0, 10, f"Name: {name}", ln=True)
     pdf.cell(0, 10, f"Certificate ID: {cert_id}", ln=True)
-    pdf.cell(0, 10, f"Valid Until: {expiry_str.split(' ') if expiry_str else 'N/A'}", ln=True) # Display Date part
+    pdf.cell(0, 10, f"Valid Until: {expiry_str or 'N/A'}", ln=True)  # Handle None or empty
     pdf.cell(0, 10, f"Status: {status.title()}", ln=True)
     pdf.ln(10)
     pdf.multi_cell(0, 10, "This certificate entitles the holder to access emergency urgent care services at partnered locations, contingent on an active paid subscription and valid certificate status.")
 
     # Save PDF to a BytesIO object
     buffer = io.BytesIO()
-    pdf.output(buffer, "S") # 'S' returns the PDF as a string, which needs to be encoded
+    pdf.output(buffer)
     buffer.seek(0)
     return buffer.getvalue()
-
 
 # --- Session State Initialization ---
 if "logged_in" not in st.session_state:
@@ -162,12 +158,11 @@ if "checkout_status" in query_params:
     # Clear query params to avoid re-showing message on refresh
     st.query_params.clear()
 
-
 # Navigation
 if st.session_state.logged_in:
-    menu_options =
+    menu_options = ["My Dashboard", "Manage Children", "Medical Questionnaire", "View Certificate", "Logout"]
 else:
-    menu_options =
+    menu_options = ["Register", "Login"]
 
 choice = st.sidebar.selectbox("Navigation", menu_options)
 
@@ -193,12 +188,12 @@ if choice == "Register" and not st.session_state.logged_in:
             else:
                 hashed_password = bcrypt.hashpw(reg_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
                 user_id = generate_unique_id()
-                certificate_id = generate_unique_id() # For the certificate itself
-                
+                certificate_id = generate_unique_id()  # For the certificate itself
+
                 # Store medical answers encrypted
                 medical_data_plain = f"Chronic Conditions: {q1}\nAllergies: {q2}\nCurrent Medications: {q3}"
                 encrypted_medical_data = fernet.encrypt(medical_data_plain.encode('utf-8')).decode('utf-8')
-                
+
                 # Initial expiry is just a placeholder, actual expiry set by webhook
                 initial_expiry = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
 
@@ -209,18 +204,17 @@ if choice == "Register" and not st.session_state.logged_in:
                     # Add member to DB with 'incomplete' subscription status initially
                     # Stripe customer ID and subscription ID will be updated by webhook after checkout.session.completed
                     db_utils.add_member(user_id, reg_name, reg_email, hashed_password, reg_children,
-                                        certificate_id, initial_expiry, encrypted_medical_data,
-                                        None, None) # Stripe IDs are None for now
-                    
+                                       certificate_id, initial_expiry, encrypted_medical_data,
+                                       None, None)  # Stripe IDs are None for now
+
                     st.info(f"Registration successful! User ID: {user_id}. You will now be redirected to Stripe to complete your subscription payment.")
                     st.markdown(f"""
                         <p>If you are not redirected automatically, <a href="{checkout_url}" target="_blank">click here to complete payment</a>.</p>
                         <meta http-equiv="refresh" content="5; url={checkout_url}">
                     """, unsafe_allow_html=True)
-                    st.session_state.processing_registration = True # Prevent re-submission
+                    st.session_state.processing_registration = True  # Prevent re-submission
                 else:
                     st.error("Could not initiate payment process. Please try again.")
-
 
 elif choice == "Login" and not st.session_state.logged_in:
     st.subheader("Member Login")
@@ -235,15 +229,15 @@ elif choice == "Login" and not st.session_state.logged_in:
                 st.session_state.name = member["name"]
                 st.session_state.user_id = member["id"]
                 st.success(f"Welcome back, {st.session_state.name}!")
-                st.rerun() # Rerun to update sidebar and view
+                st.rerun()  # Rerun to update sidebar and view
             else:
                 st.error("Invalid email or password.")
 
-elif st.session_state.logged_in: # Pages for logged-in users
+elif st.session_state.logged_in:  # Pages for logged-in users
     member_data = db_utils.get_member_by_email(st.session_state.email)
     if not member_data:
         st.error("Could not retrieve your member data. Please try logging out and in again.")
-        st.session_state.logged_in = False # Force logout
+        st.session_state.logged_in = False  # Force logout
         st.rerun()
 
     if choice == "My Dashboard":
@@ -260,14 +254,13 @@ elif st.session_state.logged_in: # Pages for logged-in users
                     expiry_dt = datetime.fromisoformat(member_data['certificate_expiry_date'].replace('Z', '+00:00'))
                     expiry_display = expiry_dt.strftime('%Y-%m-%d %H:%M:%S %Z')
                 except:
-                     expiry_display = member_data['certificate_expiry_date'] # show raw if parse fails
+                    expiry_display = member_data['certificate_expiry_date']  # show raw if parse fails
             st.write(f"**Certificate Expires On:** {expiry_display}")
 
             if member_data['subscription_status'] == 'incomplete' and member_data['stripe_customer_id'] is None:
-                 st.warning("Your subscription setup is incomplete. If you started registration but didn't complete payment, please try registering again or contact support.")
+                st.warning("Your subscription setup is incomplete. If you started registration but didn't complete payment, please try registering again or contact support.")
             elif member_data['subscription_status'] == 'incomplete' and member_data['stripe_customer_id'] is not None:
-                 st.info("Your payment might be processing. Please check back shortly. If issues persist, contact support.")
-
+                st.info("Your payment might be processing. Please check back shortly. If issues persist, contact support.")
 
     elif choice == "Manage Children":
         st.subheader("Manage Your Children")
@@ -275,9 +268,9 @@ elif st.session_state.logged_in: # Pages for logged-in users
             current_children = member_data['children']
             st.write(f"You currently have **{current_children}** children registered on your plan.")
             new_count = st.number_input("Update number of children for your subscription:", min_value=0, value=current_children, step=1)
-            
+
             if st.button("Update Children Count"):
-                if new_count!= current_children:
+                if new_count != current_children:
                     if update_stripe_subscription_children(member_data['stripe_subscription_id'], new_count):
                         db_utils.update_children_count(st.session_state.email, new_count)
                         st.success(f"Children count updated to {new_count}. Your Stripe subscription has been modified. Changes will reflect in your next billing cycle.")
@@ -299,7 +292,7 @@ elif st.session_state.logged_in: # Pages for logged-in users
                 except Exception as e:
                     st.error(f"Could not decrypt medical information. Error: {e}")
                     decrypted_answers = "Error decrypting information."
-            
+
             st.markdown("Current Information:")
             st.text_area("Saved Answers:", value=decrypted_answers, height=200, disabled=True)
             st.info("To update your medical information, please contact support. (Self-service update not yet implemented).")
@@ -309,16 +302,16 @@ elif st.session_state.logged_in: # Pages for logged-in users
         st.subheader("Your Urgent Care Certificate")
         if member_data:
             is_valid = is_certificate_valid_from_db(member_data['certificate_expiry_date'], member_data['certificate_status'])
-            
+
             st.write(f"**Name:** {member_data['name']}")
             st.write(f"**Certificate ID:** {member_data['certificate_id']}")
             expiry_display = "N/A"
             if member_data['certificate_expiry_date']:
                 try:
                     expiry_dt = datetime.fromisoformat(member_data['certificate_expiry_date'].replace('Z', '+00:00'))
-                    expiry_display = expiry_dt.strftime('%Y-%m-%d') # Just date for display
+                    expiry_display = expiry_dt.strftime('%Y-%m-%d')  # Just date for display
                 except:
-                     expiry_display = member_data['certificate_expiry_date']
+                    expiry_display = member_data['certificate_expiry_date']
 
             st.write(f"**Expires On:** {expiry_display}")
             st.write(f"**Status:** {member_data['certificate_status'].title()}")
@@ -345,11 +338,12 @@ elif st.session_state.logged_in: # Pages for logged-in users
         st.session_state.name = ""
         st.session_state.user_id = ""
         st.success("You have been logged out.")
-        st.query_params.clear() # Clear any checkout params on logout
+        st.query_params.clear()  # Clear any checkout params on logout
         st.rerun()
-# Corrected line:
-elif choice in and not st.session_state.logged_in:
-     st.warning("Please log in to access this page.")
+
+# Handle unauthorized access to logged-in pages
+elif choice in ["My Dashboard", "Manage Children", "Medical Questionnaire", "View Certificate"] and not st.session_state.logged_in:
+    st.warning("Please log in to access this page.")
 
 st.sidebar.markdown("---")
 st.sidebar.info("This is a demo application. For actual medical emergencies, please contact your local emergency services.")
