@@ -55,6 +55,17 @@ def create_stripe_subscription(email, children):
     )
     return customer.id, subscription.id, subscription.latest_invoice.payment_intent.client_secret
 
+def update_stripe_children(subscription_id, new_quantity):
+    subscription = stripe.Subscription.retrieve(subscription_id)
+    items = subscription["items"]["data"]
+    for item in items:
+        if item["price"]["id"] == CHILD_PRICE_ID:
+            stripe.Subscription.modify_item(
+                item["id"],
+                quantity=new_quantity
+            )
+    return True
+
 def generate_certificate_pdf(name, cert_id, expiry):
     pdf = FPDF()
     pdf.add_page()
@@ -75,7 +86,7 @@ def generate_certificate_pdf(name, cert_id, expiry):
 st.title("Emergency Urgent Care Membership")
 st.write("Pay $20/month (+$5 per child) to get urgent care access at local clinics.")
 
-menu = ["Register", "Check Certificate"]
+menu = ["Register", "Check Certificate", "Manage Children"]
 choice = st.sidebar.selectbox("Navigation", menu)
 
 if choice == "Register":
@@ -127,3 +138,22 @@ elif choice == "Check Certificate":
                 st.error("Certificate has expired.")
         else:
             st.error("Certificate ID not found.")
+
+elif choice == "Manage Children":
+    email = st.text_input("Enter your registered email")
+    new_count = st.number_input("Update number of children", min_value=0, step=1)
+    if st.button("Update Children Count"):
+        c.execute("SELECT stripe_subscription_id FROM members WHERE email=?", (email,))
+        result = c.fetchone()
+        if result:
+            subscription_id = result[0]
+            try:
+                update_stripe_children(subscription_id, new_count)
+                c.execute("UPDATE members SET children=?, total_payment=? WHERE email=?", (new_count, calculate_payment(new_count), email))
+                conn.commit()
+                st.success("Child count updated and Stripe subscription modified successfully.")
+            except Exception as e:
+                st.error(f"Stripe update failed: {e}")
+        else:
+            st.error("Email not found.")
+
