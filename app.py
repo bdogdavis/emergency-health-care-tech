@@ -50,7 +50,7 @@ def is_certificate_valid_from_db(expiry_date_str, status):
 
 def create_stripe_checkout_session(email, children_count, user_id_for_metadata):
     try:
-        line_items =
+        line_items = # Corrected line
         if children_count > 0:
             line_items.append({"price": CHILD_PRICE_ID, "quantity": children_count})
 
