@@ -1,5 +1,8 @@
 streamlit
+bcrypt
 stripe
 fpdf
-bcrypt
 cryptography
+sqlite3  # optional, built-in with Python—can be omitted
+fastapi
+uvicorn
