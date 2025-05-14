@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 import uuid
 import stripe
 import os
+from fpdf import FPDF
+import io
 
 # --- Stripe Configuration ---
 stripe.api_key = st.secrets["stripe_secret_key"]
@@ -53,6 +55,22 @@ def create_stripe_subscription(email, children):
     )
     return customer.id, subscription.id, subscription.latest_invoice.payment_intent.client_secret
 
+def generate_certificate_pdf(name, cert_id, expiry):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(200, 10, "Emergency Urgent Care Certificate", ln=True, align='C')
+    pdf.ln(10)
+    pdf.set_font("Arial", '', 12)
+    pdf.cell(200, 10, f"Name: {name}", ln=True)
+    pdf.cell(200, 10, f"Certificate ID: {cert_id}", ln=True)
+    pdf.cell(200, 10, f"Valid Until: {expiry}", ln=True)
+    pdf.ln(10)
+    pdf.multi_cell(200, 10, "This certificate entitles the holder to access emergency urgent care services at partnered locations, contingent on an active paid subscription.")
+    pdf_output = io.BytesIO()
+    pdf.output(pdf_output)
+    return pdf_output.getvalue()
+
 # --- Streamlit UI ---
 st.title("Emergency Urgent Care Membership")
 st.write("Pay $20/month (+$5 per child) to get urgent care access at local clinics.")
@@ -101,6 +119,11 @@ elif choice == "Check Certificate":
             valid = is_certificate_valid(expiry)
             st.write(f"Name: {name}")
             st.write(f"Certificate Expiry: {expiry}")
-            st.success("Certificate is valid.") if valid else st.error("Certificate has expired.")
+            if valid:
+                st.success("Certificate is valid.")
+                pdf_bytes = generate_certificate_pdf(name, cert_input, expiry)
+                st.download_button("Download Certificate PDF", data=pdf_bytes, file_name=f"certificate_{cert_input}.pdf", mime="application/pdf")
+            else:
+                st.error("Certificate has expired.")
         else:
             st.error("Certificate ID not found.")
