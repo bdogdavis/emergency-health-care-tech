@@ -1,3 +1,4 @@
 streamlit
 stripe
 fpdf
+bcrypt
