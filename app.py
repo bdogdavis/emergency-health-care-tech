@@ -129,3 +129,54 @@ if choice == "Register":
             st.info("This certificate is valid for 30 days from today.")
             st.write("Use the Stripe payment interface below to complete your subscription.")
             st.write(f"Payment Intent Client Secret: {client_secret}")
+
+elif choice == "Login":
+    email = st.text_input("Email")
+    password = st.text_input("Password", type="password")
+    if st.button("Login"):
+        c.execute("SELECT password_hash FROM members WHERE email=?", (email,))
+        row = c.fetchone()
+        if row and bcrypt.checkpw(password.encode(), row[0].encode()):
+            st.session_state.logged_in = True
+            st.session_state.email = email
+            st.success("Login successful.")
+        else:
+            st.error("Invalid email or password.")
+
+elif choice == "Check Certificate" and st.session_state.logged_in:
+    c.execute("SELECT name, certificate_id, certificate_expiry FROM members WHERE email=?", (st.session_state.email,))
+    result = c.fetchone()
+    if result:
+        name, cert_id, expiry = result
+        valid = is_certificate_valid(expiry)
+        st.write(f"Name: {name}")
+        st.write(f"Certificate ID: {cert_id}")
+        st.write(f"Certificate Expiry: {expiry}")
+        if valid:
+            st.success("Certificate is valid.")
+            pdf_bytes = generate_certificate_pdf(name, cert_id, expiry)
+            st.download_button("Download Certificate PDF", data=pdf_bytes, file_name=f"certificate_{cert_id}.pdf", mime="application/pdf")
+        else:
+            st.error("Certificate has expired.")
+    else:
+        st.error("No certificate found.")
+
+elif choice == "Manage Children" and st.session_state.logged_in:
+    new_count = st.number_input("Update number of children", min_value=0, step=1)
+    if st.button("Update Children Count"):
+        c.execute("SELECT stripe_subscription_id FROM members WHERE email=?", (st.session_state.email,))
+        result = c.fetchone()
+        if result:
+            subscription_id = result[0]
+            try:
+                update_stripe_children(subscription_id, new_count)
+                c.execute("UPDATE members SET children=?, total_payment=? WHERE email=?", (new_count, calculate_payment(new_count), st.session_state.email))
+                conn.commit()
+                st.success("Child count updated and Stripe subscription modified successfully.")
+            except Exception as e:
+                st.error(f"Stripe update failed: {e}")
+        else:
+            st.error("Subscription not found.")
+else:
+    if not st.session_state.logged_in and choice in ["Check Certificate", "Manage Children"]:
+        st.warning("Please log in first to access this page.")
