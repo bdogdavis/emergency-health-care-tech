@@ -80,7 +80,7 @@ def update_stripe_subscription_children(subscription_id, new_quantity):
             elif item['price']['id'] == BASE_PRICE_ID:
                 base_item_id = item['id']
 
-        items_to_update =
+        items_to_update = []
         if base_item_id:
              items_to_update.append({'id': base_item_id, 'quantity': 1}) # Keep base
         else: # Should not happen if subscription was set up correctly
