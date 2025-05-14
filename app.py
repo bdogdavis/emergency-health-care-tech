@@ -50,7 +50,7 @@ def is_certificate_valid_from_db(expiry_date_str, status):
 
 def create_stripe_checkout_session(email, children_count, user_id_for_metadata):
     try:
-        line_items = [{"price": BASE_PRICE_ID, "quantity": 1}]
+        line_items = 
         if children_count > 0:
             line_items.append({"price": CHILD_PRICE_ID, "quantity": children_count})
 
@@ -80,7 +80,7 @@ def update_stripe_subscription_children(subscription_id, new_quantity):
             elif item['price']['id'] == BASE_PRICE_ID:
                 base_item_id = item['id']
 
-        items_to_update = []
+        items_to_update =
         if base_item_id:
              items_to_update.append({'id': base_item_id, 'quantity': 1}) # Keep base
         else: # Should not happen if subscription was set up correctly
@@ -165,9 +165,9 @@ if "checkout_status" in query_params:
 
 # Navigation
 if st.session_state.logged_in:
-    menu_options = []
+    menu_options =
 else:
-    menu_options = []
+    menu_options =
 
 choice = st.sidebar.selectbox("Navigation", menu_options)
 
@@ -347,6 +347,7 @@ elif st.session_state.logged_in: # Pages for logged-in users
         st.success("You have been logged out.")
         st.query_params.clear() # Clear any checkout params on logout
         st.rerun()
+# Corrected line 350
 elif choice in and not st.session_state.logged_in:
      st.warning("Please log in to access this page.")
 
