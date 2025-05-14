@@ -10,12 +10,13 @@ from cryptography.fernet import Fernet
 import db_utils  # Our database utility module
 
 # --- Configuration ---
+# --- Configuration ---
 try:
     stripe.api_key = st.secrets["stripe_secret_key"]
     BASE_PRICE_ID = st.secrets["base_price_id"]
     CHILD_PRICE_ID = st.secrets["child_price_id"]
     FERNET_KEY = st.secrets["fernet_key"].encode()  # Ensure it's bytes
-    APP_BASE_URL ==st.secrets["app_base_url"]
+    APP_BASE_URL = st.secrets["app_base_url"]  # Fixed assignment
     fernet = Fernet(FERNET_KEY)
 except KeyError as e:
     st.error(f"Configuration error: Missing secret key {e}. Please check your secrets.toml.")
