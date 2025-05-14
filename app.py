@@ -165,9 +165,9 @@ if "checkout_status" in query_params:
 
 # Navigation
 if st.session_state.logged_in:
-    menu_options =
+    menu_options = []
 else:
-    menu_options =
+    menu_options = []
 
 choice = st.sidebar.selectbox("Navigation", menu_options)
 
