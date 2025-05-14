@@ -1,8 +1,7 @@
-streamlit
-bcrypt
-stripe
-fpdf
-cryptography
-sqlite3  # optional, built-in with Python—can be omitted
-fastapi
-uvicorn
+streamlit==1.32.2
+bcrypt==4.1.2
+stripe==8.6.0
+fpdf==1.7.2
+cryptography==42.0.5
+fastapi==0.110.0
+uvicorn==0.29.0
